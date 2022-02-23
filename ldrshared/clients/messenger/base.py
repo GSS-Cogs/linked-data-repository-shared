@@ -20,19 +20,14 @@ class BaseMessage(metaclass=ABCMeta):
         ...
 
     @abstractmethod
-    def get(self, key=None, default=None) -> Union[str, dict]:
+    def get(self, key=None, default=None) -> Union[str, dict, list]:
         """
-        Get message as either dict or string. Message structure is:
+        Get message content. Empty parenthesis will return the whole 
+        message as dict or str (dict where castable, else str).
 
-        {
-            "time_stamp": "<INSTANT OF PUBLICATION PUT>",
-            "content": "<THE 'MESSAGE' THAT WAS PASSED IN>"
-        }
-
-        Empty parenthesis will return the whole message as dict,
-        you can also .get(<TOP_LEVEL_KEY>) directly if you want to.
-
-        Returns will be type dict where castable else str.
+        You can also .get(key) as per standard dictionary get
+        mechanism, which will return one of str|dict|list
+        depending on the document in question. 
         """
         ...
 

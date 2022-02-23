@@ -29,7 +29,7 @@ class PubSubMessage(BaseMessage):
     def get_attribute(self, key: str, default=None):
         return self.message.attributes.get(key, default)
 
-    def get(self, key=None, default=None) -> Union[dict, str]:
+    def get(self, key=None, default=None) -> Union[dict, str, list]:
         data: str = self.message.data.decode("utf-8")
         if key:
             data_as_dict: dict = json.loads(data)
