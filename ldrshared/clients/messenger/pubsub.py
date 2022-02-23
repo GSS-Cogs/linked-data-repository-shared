@@ -218,14 +218,6 @@ class PubSubClient(BaseMessenger):
         """
         Put one message into the subscribed topic. The message
         must be a str or a dictionary (that will be cast to str).
-
-        This str messge will be added to a dictionary along with
-        a time_stamp, eg:
-
-        {
-            "content": <YOUR MESSAGE>,
-            "time_stamp": <A TIME STAMP>
-        }
         """
         if isinstance(message_content, dict):
             message_content = json.dumps(message_content)
