@@ -183,6 +183,26 @@ class TestViaGCP:
         message: PubSubMessage = client.get_next_message()
         assert message.get_attribute("foo") == "bar"
 
+    def test_dict_message_functionality(self, client: PubSubClient):
+        """
+        Test basic message as dictionary functionality
+        """
+
+        topic: pubsub_gapic_types.Topic = pristine_test_topic()
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(
+            topic
+        )
+
+        msg_to_send = {"a_field": "a_value"}
+        client.put_one_message(topic, msg_to_send)
+
+        client.subscribe(subscription)
+
+        message: PubSubMessage = client.get_next_message()
+
+        assert isinstance(message.get(), dict)
+        assert message.get("a_field") == "a_value"
+
     def test_message_retention_is_configurable(self):
         """
         Confirm that should we configure 0 retention of recieved messages, no

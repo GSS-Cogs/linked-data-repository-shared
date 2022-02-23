@@ -22,15 +22,19 @@ while True:
     # note: default timeout is 10 seconds, that's probably fine
     message: Union[BaseMessage, None] = client.get_next_message(timeout=30)
     if message:
-        message_as_dict: dict = message.get()
-        field_from_message: Union[str, dict] = message.get('content')
-        # do something with it
+        # Message contents can be str or dict
+        message_content: Union[str, dict] = message.get()
+
+        # If its dict you can get fields directly
+        message_content: str = message.get('field', 'OPTIONAL-default-is-None')
+
+        # do something with message_content
 
 # -----
 # Put a message
 client.put_one_message('my-topic', 'I r a message')
 # or
-client.put_one_message('my-topic', {'i am': 'a more complex message'})
+client.put_one_message('my-topic', {'I r': 'a more complex message'})
 ```
 
 NOTE: You'll also need to:
@@ -65,5 +69,5 @@ To run these tests:
 * Install the gcp cli https://cloud.google.com/sdk/docs/install
 * Authenticate your machine with `gcloud auth login` and your **gsscogs.uk** address
 * use `gcloud auth application-default login` and your **gsscogs.uk** address - this will tell gcloud to use your developer credentials for applications locally (in place of holdings lots of different service account credentials on your machine).
-* `chmod +x ./tests.sh`
-* From then on you can run the gcp tests via `./tests.sh` 
+* `poetry install`
+* `poetry run poetry run pytest -v` 
