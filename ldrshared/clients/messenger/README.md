@@ -17,7 +17,7 @@ client: BaseMessenger = PubSubClient()
 # -----
 # Subscribe and get messages
 
-client.subscribe('my-topic')
+client.subscribe('subscription-1-to-topic-1')
 while True:
     # note: default timeout is 10 seconds, that's probably fine
     message: Union[BaseMessage, None] = client.get_next_message(timeout=30)
@@ -32,9 +32,9 @@ while True:
 
 # -----
 # Put a message
-client.put_one_message('my-topic', 'I r a message')
+client.put_one_message('topic-1', 'I r a message')
 # or
-client.put_one_message('my-topic', {'I r': 'a more complex message'})
+client.put_one_message('topic-1', {'I r': 'a more complex message'})
 ```
 
 NOTE: You'll also need to:
