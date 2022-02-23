@@ -12,7 +12,7 @@ pytest = "^7.0.0"
 
 [tool.pytest.ini_options]
 testpaths = [
-    "gcp_tests/pubsub.py"
+    "tests/pubsub.py"
 ]
 
 [tool.poetry.dev-dependencies]

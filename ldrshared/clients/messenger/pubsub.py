@@ -10,11 +10,12 @@ from google.cloud.pubsub_v1.subscriber.futures import StreamingPullFuture
 from google.cloud.pubsub_v1.publisher.futures import Future
 from google.pubsub_v1.types import pubsub as pubsub_gapic_types
 from google.cloud.pubsub_v1.subscriber.message import Message
-from tinydb import TinyDB, Query, where
+from tinydb import TinyDB, Query
 
 from .base import BaseMessenger, BaseMessage
 
 STR_TIME = "%b/%d/%Y %H:%M:%S"
+TIME_STAMP_KEY = "_published_time_stamp"
 
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", None)
 if not GCP_PROJECT_ID:
@@ -29,11 +30,15 @@ class PubSubMessage(BaseMessage):
         return self.message.attributes.get(key, default)
 
     def get(self, key=None, default=None) -> Union[dict, str]:
-        data_dict: dict = json.loads(self.message.data.decode("utf-8"))
-        if not key:
-            return data_dict
-        else:
-            return data_dict.get(key, default)
+        data: str = self.message.data.decode("utf-8")
+        if key:
+            data_as_dict: dict = json.loads(data)
+            return data_as_dict.get(key, default)
+
+        try:
+            return json.loads(data)
+        except:
+            return data
 
 
 # TODO - will need to be implemented with an actual database
@@ -62,8 +67,10 @@ class Deduplicator:
         """
         Convert type pubsub_v1.subscriber.message.Message to a simple dict
         """
-        data_dict = json.loads(message.data.decode("utf-8"))
-        return {"content": data_dict["content"], "time_stamp": data_dict["time_stamp"]}
+        return {
+            "content": message.data.decode("utf-8"),
+            "time_stamp": message.attributes.get(TIME_STAMP_KEY),
+        }
 
     def store(self, message: Message):
         """
@@ -223,13 +230,17 @@ class PubSubClient(BaseMessenger):
         if isinstance(message_content, dict):
             message_content = json.dumps(message_content)
 
-        publisher_client = PublisherClient()
-        message_as_bytes: bytes = json.dumps(
-            {
-                "time_stamp": datetime.datetime.now().strftime(STR_TIME),
-                "content": message_content,
+        if message_attributes:
+            message_attributes[TIME_STAMP_KEY] = datetime.datetime.now().strftime(
+                STR_TIME
+            )
+        else:
+            message_attributes = {
+                TIME_STAMP_KEY: datetime.datetime.now().strftime(STR_TIME)
             }
-        ).encode("utf-8")
+
+        publisher_client = PublisherClient()
+        message_as_bytes: bytes = message_content.encode("utf-8")
         publish_future: Future = publisher_client.publish(
             topic.name, message_as_bytes, **message_attributes
         )

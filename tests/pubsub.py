@@ -106,7 +106,9 @@ class TestViaGCP:
         Create topic, write a message to it, subscribe, read it out
         """
         topic: pubsub_gapic_types.Topic = pristine_test_topic()
-        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(
+            topic
+        )
 
         msg_to_send = "foo message bar"
         client.put_one_message(topic, msg_to_send)
@@ -115,7 +117,7 @@ class TestViaGCP:
         message: PubSubMessage = client.get_next_message()
 
         assert (
-            message.get("content") == msg_to_send
+            message.get() == msg_to_send
         ), f"Got message {message}, expected message {msg_to_send}"
 
     def test_unacknowlaged_message_can_be_read_again(self, client: PubSubClient):
@@ -123,7 +125,9 @@ class TestViaGCP:
         Create topic, write a message to it, subscribe, read it out
         """
         topic: pubsub_gapic_types.Topic = pristine_test_topic()
-        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(
+            topic
+        )
 
         msg_to_send = "foo message bar"
         client.put_one_message(topic, msg_to_send)
@@ -134,7 +138,7 @@ class TestViaGCP:
             message: PubSubMessage = client.get_next_message()
 
             assert (
-                message.get("content") == msg_to_send
+                message.get() == msg_to_send
             ), f"Got message {message}, expected message {msg_to_send}"
 
     def test_acknowlaged_message_can_only_be_read_once(self, client: PubSubClient):
@@ -143,7 +147,9 @@ class TestViaGCP:
         then confirm we cannot pull the message again.
         """
         topic: pubsub_gapic_types.Topic = pristine_test_topic()
-        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(
+            topic
+        )
 
         msg_to_send = "foo message bar"
         client.put_one_message(topic, msg_to_send)
@@ -152,7 +158,7 @@ class TestViaGCP:
 
         message: PubSubMessage = client.get_next_message()
         assert (
-            message.get("content") == msg_to_send
+            message.get() == msg_to_send
         ), f"Got message {message}, expected message {msg_to_send}"
         client.confirm_received(message)
 
@@ -165,7 +171,9 @@ class TestViaGCP:
         """
 
         topic: pubsub_gapic_types.Topic = pristine_test_topic()
-        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(
+            topic
+        )
 
         msg_to_send = "foo message bar"
         client.put_one_message(topic, msg_to_send, foo="bar")
@@ -186,7 +194,9 @@ class TestViaGCP:
         client: PubSubClient = PubSubClient(dbname="test_db.json", message_retention={})
 
         topic: pubsub_gapic_types.Topic = pristine_test_topic()
-        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(
+            topic
+        )
 
         msg_to_send = "foo message bar"
         client.put_one_message(topic, msg_to_send)
@@ -199,6 +209,7 @@ class TestViaGCP:
 
         message2: PubSubMessage = client.get_next_message()
         assert message2
+
 
 if __name__ == "__main__":
     TestViaGCP()
