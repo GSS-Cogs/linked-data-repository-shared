@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from typing import Union
 
 
 class BaseMessage(metaclass=ABCMeta):
@@ -10,11 +11,29 @@ class BaseMessage(metaclass=ABCMeta):
         self.message: object = message
 
     @abstractmethod
-    def get_attribute(self, attribute: str):
+    def get_attribute(self, key: str, default=None) -> str:
+        """
+        Get a single attribute as attached to the message.
+
+        Follows dictionary get pattern, i.e: .get(key, default)
+        """
         ...
 
     @abstractmethod
-    def get(self):
+    def get(self, key=None, default=None) -> Union[str, dict]:
+        """
+        Get message as either dict or string. Message structure is:
+
+        {
+            "time_stamp": "<INSTANT OF PUBLICATION PUT>",
+            "content": "<THE 'MESSAGE' THAT WAS PASSED IN>"
+        }
+
+        Empty parenthesis will return the whole message as dict,
+        you can also .get(<TOP_LEVEL_KEY>) directly if you want to.
+
+        Returns will be type dict where castable else str.
+        """
         ...
 
 

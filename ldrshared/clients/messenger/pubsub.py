@@ -1,5 +1,6 @@
 from concurrent.futures._base import TimeoutError
 import datetime
+import logging
 import json
 import os
 from typing import Union, List
@@ -20,26 +21,19 @@ if not GCP_PROJECT_ID:
     raise ValueError("You need to set the project id via the env var GCP_PROJECT_ID")
 
 
+# Note: docstrings inherit from base class
 class PubSubMessage(BaseMessage):
     message: Message
 
-    def get_attribute(self, attribute: str):
-        """
-        Gets contents of a single message attribute
-        """
-        return getattr(self.message, attribute)
+    def get_attribute(self, key: str, default=None):
+        return self.message.attributes.get(key, default)
 
-    def get(self, key=None, default_value=None) -> Union[dict, str]:
-        """
-        Gets message content. Empty parenthesis returns the whole
-        message dict. Though you can also pass through a dictionary
-        style get, i.e .get(key, default)
-        """
+    def get(self, key=None, default=None) -> Union[dict, str]:
         data_dict: dict = json.loads(self.message.data.decode("utf-8"))
         if not key:
             return data_dict
         else:
-            return data_dict.get(key, default_value)
+            return data_dict.get(key, default)
 
 
 # TODO - will need to be implemented with an actual database
@@ -53,14 +47,21 @@ class Deduplicator:
     def __init__(self, dbname: str, message_retention: dict):
         self.db = TinyDB(dbname)
         self.message_retention: datetime.timedelta = datetime.timedelta(
-            days = message_retention["days"] if "days" in message_retention else 0,
-            hours = message_retention["hours"] if "hours" in message_retention else 0,
-            minutes = message_retention["minutes"] if "minutes" in message_retention else 0,
-            seconds = message_retention["seconds"] if "seconds" in message_retention else 0
+            days=message_retention["days"] if "days" in message_retention else 0,
+            hours=message_retention["hours"] if "hours" in message_retention else 0,
+            minutes=message_retention["minutes"]
+            if "minutes" in message_retention
+            else 0,
+            seconds=message_retention["seconds"]
+            if "seconds" in message_retention
+            else 0,
         )
 
     @staticmethod
     def _message_to_dict(message: Message) -> dict:
+        """
+        Convert type pubsub_v1.subscriber.message.Message to a simple dict
+        """
         data_dict = json.loads(message.data.decode("utf-8"))
         return {"content": data_dict["content"], "time_stamp": data_dict["time_stamp"]}
 
@@ -81,27 +82,31 @@ class Deduplicator:
             (q.content == new_message_as_dict["content"])
             & (q.time_stamp == new_message_as_dict["time_stamp"])
         )
-
         return len(found) == 0
 
-    def message_is_in_list(self, message: Message, list_of_messages: List[Message]) -> bool:
+    def message_is_in_list(
+        self, message: Message, list_of_messages: List[Message]
+    ) -> bool:
         """
         Does the received message already exist in the provided list of messages.
 
-        Note, we need to cast the message to a much simplified form as pubsub.Message
-        attributes otherwise render all messages unique, even where they are duplicates.
+        Note, we need to cast the message to a much simplified dict form as pubsub.Message
+        attributes otherwise render all messages unique, even where they are duplicates
+        in term of being the same pushed message.
         """
         new_message = self._message_to_dict(message)
         known_messages = [self._message_to_dict(x) for x in list_of_messages]
+
         return new_message in known_messages
 
     def _housekeeping(self):
         """
-        Simple mechanism for stopping the inline database from getting 
+        Simple mechanism for stopping the inline database from getting
         too bloated by dropping records that are older than:
-        
-        dateime.now() - self.message_retention # a datetime.timedelta()
+
+        datetime.now() - self.message_retention # a datetime.timedelta()
         """
+        self.db: TinyDB
 
         # Note: .doc_id's are auto incrementing.
         record_id = min([int(x.doc_id) for x in self.db])
@@ -110,11 +115,20 @@ class Deduplicator:
 
         while True:
             record = self.db.get(doc_id=record_id)
-            time_stamp_as_datetime = datetime.datetime.strptime(record["time_stamp"], STR_TIME)
-            if time_stamp_as_datetime < (datetime.datetime.now() - self.message_retention):
-                self.db.remove(where('_default') == record_id)
+            time_stamp_as_datetime = datetime.datetime.strptime(
+                record["time_stamp"], STR_TIME
+            )
+            if time_stamp_as_datetime <= (
+                datetime.datetime.now() - self.message_retention
+            ):
+                logging.warning(f"Length was {len(self.db)}")
+                self.db.remove(doc_ids=[record_id])
+                logging.warning(f"Length is {len(self.db)}")
                 record_id = str(int(record_id) + 1)
             else:
+                logging.warning(
+                    f"Comparing: {time_stamp_as_datetime} and {datetime.datetime.now() - self.message_retention}"
+                )
                 break
 
             # Never look beyond the last populated index
@@ -128,13 +142,13 @@ class PubSubClient(BaseMessenger):
         """
         Setup for pubsub client
 
-        dbname: Filename for the tonydb inline message database,
-                for testing.
+        dbname: Filename for the Tinydb inline message database,
+                configurable for testing.
         message_retention: Allows altering of retention period
-                for inline message database, for testing,
+                for inline message database, configurable for testing,
         """
         self._project_id = GCP_PROJECT_ID
-        self.messages = []
+        self.message_buffer = []
         self.deduplicator = Deduplicator(dbname, message_retention)
         self.found_message_duplicate = False
 
@@ -149,11 +163,16 @@ class PubSubClient(BaseMessenger):
         )
 
         def callback(message: Message) -> None:
+            # Is message in database as previously processed?
             if self.deduplicator.is_new_message(message):
                 message.nack()
-                if not self.deduplicator.message_is_in_list(message, self.messages):
-                    self.messages.append(message)
+                # Is message already in buffer waiting to be processed?
+                if not self.deduplicator.message_is_in_list(
+                    message, self.message_buffer
+                ):
+                    self.message_buffer.append(message)
             else:
+                message.ack()
                 self.found_message_duplicate = True
 
         self.streaming_pull_future: StreamingPullFuture = subscriber_client.subscribe(
@@ -164,46 +183,34 @@ class PubSubClient(BaseMessenger):
         """
         Get the next message from the currently subscribed topic
         """
-        # If we've already got unprocessed messages in the buffer then use the
-        # next one, don't bother polling for more
-        if len(self.messages) > 0:
-            return PubSubMessage(self.messages.pop())
+
+        # Don't pull if we already have messages in the buffer
+        if len(self.message_buffer) > 0:
+            return PubSubMessage(self.message_buffer.pop())
 
         subscriber_client = SubscriberClient()
         streaming_pull_future: StreamingPullFuture = self.streaming_pull_future
 
-        # Go looking (for length of timeout seconds) for new messages
+        # Go looking (for length of timeout: seconds) for new messages
         with subscriber_client:
-
             try:
-                # Note: if you poll without a timout, its infinite and will block
-                # even where one or more messages are found
                 streaming_pull_future.result(timeout=timeout)
             except TimeoutError:
-                streaming_pull_future.cancel()
-                streaming_pull_future.result()
+                pass
 
-        # Where we have found a duplicate, we're gonna go round again
-        # and look for the next message.
-        if self.found_message_duplicate:
-            self.found_message_duplicate = False
+        if len(self.message_buffer) > 0:
             return self.get_next_message(timeout=timeout)
-
-        if len(self.messages) > 0:
-            msg = PubSubMessage(self.messages.pop())
-        else:
-            msg = None
-
-        return msg
+        return None
 
     def put_one_message(
         self,
         topic: pubsub_gapic_types.Topic,
-        message_str: str,
+        message_content: Union[str, dict],
+        **message_attributes,
     ):
         """
         Put one message into the subscribed topic. The message
-        must be a str or castable to a str.
+        must be a str or a dictionary (that will be cast to str).
 
         This str messge will be added to a dictionary along with
         a time_stamp, eg:
@@ -213,14 +220,19 @@ class PubSubClient(BaseMessenger):
             "time_stamp": <A TIME STAMP>
         }
         """
-        if not isinstance(message_str, str):
-            message_str = str(message_str)
+        if isinstance(message_content, dict):
+            message_content = json.dumps(message_content)
 
         publisher_client = PublisherClient()
         message_as_bytes: bytes = json.dumps(
-            {"time_stamp": datetime.datetime.now().strftime(STR_TIME), "content": message_str}
+            {
+                "time_stamp": datetime.datetime.now().strftime(STR_TIME),
+                "content": message_content,
+            }
         ).encode("utf-8")
-        publish_future: Future = publisher_client.publish(topic.name, message_as_bytes)
+        publish_future: Future = publisher_client.publish(
+            topic.name, message_as_bytes, **message_attributes
+        )
         publish_future.result()
 
     def confirm_received(self, message: PubSubMessage):

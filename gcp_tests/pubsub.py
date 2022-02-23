@@ -1,23 +1,15 @@
-"""
-These tests have some degree of reliance on GCP credentials, so will only be
-ran on specific user instruction (i.e not by github on PR's).
-"""
-
-import logging
+import datetime
 import os
 from pathlib import Path
-from time import sleep
-from typing import Union
 import uuid
 
 
-from google.cloud.pubsub_v1 import PublisherClient
+from google.cloud.pubsub_v1 import PublisherClient, SubscriberClient
 from google.pubsub_v1.types import pubsub as pubsub_gapic_types
 from google.api_core.exceptions import NotFound
 import pytest
 
-from clients.messenger.pubsub import PubSubClient, PubSubMessage
-from google.cloud.pubsub_v1 import PublisherClient, SubscriberClient
+from ldrshared.clients.messenger.pubsub import PubSubClient, PubSubMessage
 
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", None)
 if not GCP_PROJECT_ID:
@@ -35,15 +27,16 @@ def remove_test_db_if_exists():
     if old_db.exists():
         os.remove(old_db)
 
+
 @pytest.fixture
 def client() -> PubSubClient:
     remove_test_db_if_exists()
     return PubSubClient(dbname="test_db.json")
 
 
-# Note: We're conciously NOT giving our client the ability to create a topic
+# Note: We're consciously NOT giving our client the ability to create a topic
 # as that's better handled as part of infrastructure.
-def create_test_topic() -> pubsub_gapic_types.Topic:
+def pristine_test_topic() -> pubsub_gapic_types.Topic:
     """
     Helper, creates then returns a test topic
     """
@@ -55,9 +48,9 @@ def create_test_topic() -> pubsub_gapic_types.Topic:
     return topic
 
 
-# Note: We're conciously NOT giving our client the abilty to create a subscription
+# Note: We're consciously NOT giving our client the abilty to create a subscription
 # as that's better handled as part of infrastructure.
-def create_test_subscription(
+def pristine_test_subscription(
     topic: pubsub_gapic_types.Topic,
 ) -> pubsub_gapic_types.Subscription:
     assert isinstance(topic, pubsub_gapic_types.Topic)
@@ -105,15 +98,15 @@ class TestViaGCP:
 
     def test_a_message_can_be_published(self, client: PubSubClient):
         """ """
-        topic = create_test_topic()
+        topic = pristine_test_topic()
         client.put_one_message(topic, "foo message bar")
 
     def test_message_can_be_published_subscribed_and_read(self, client: PubSubClient):
         """
         Create topic, write a message to it, subscribe, read it out
         """
-        topic: pubsub_gapic_types.Topic = create_test_topic()
-        subscription: pubsub_gapic_types.Subscription = create_test_subscription(topic)
+        topic: pubsub_gapic_types.Topic = pristine_test_topic()
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
 
         msg_to_send = "foo message bar"
         client.put_one_message(topic, msg_to_send)
@@ -129,8 +122,8 @@ class TestViaGCP:
         """
         Create topic, write a message to it, subscribe, read it out
         """
-        topic: pubsub_gapic_types.Topic = create_test_topic()
-        subscription: pubsub_gapic_types.Subscription = create_test_subscription(topic)
+        topic: pubsub_gapic_types.Topic = pristine_test_topic()
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
 
         msg_to_send = "foo message bar"
         client.put_one_message(topic, msg_to_send)
@@ -138,7 +131,6 @@ class TestViaGCP:
         client.subscribe(subscription)
 
         for _ in range(3):
-
             message: PubSubMessage = client.get_next_message()
 
             assert (
@@ -147,29 +139,45 @@ class TestViaGCP:
 
     def test_acknowlaged_message_can_only_be_read_once(self, client: PubSubClient):
         """
-        Create topic, write a message to it, subscribe, read it out, the acknowlage it,
-        then confirm the topic is now empty
+        Create topic, write a message to it, subscribe, read it out, then acknowlage it,
+        then confirm we cannot pull the message again.
         """
-        topic: pubsub_gapic_types.Topic = create_test_topic()
-        subscription: pubsub_gapic_types.Subscription = create_test_subscription(topic)
+        topic: pubsub_gapic_types.Topic = pristine_test_topic()
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
 
         msg_to_send = "foo message bar"
         client.put_one_message(topic, msg_to_send)
 
         client.subscribe(subscription)
 
-        message: Union[PubSubMessage, None] = client.get_next_message()
+        message: PubSubMessage = client.get_next_message()
         assert (
             message.get("content") == msg_to_send
         ), f"Got message {message}, expected message {msg_to_send}"
         client.confirm_received(message)
 
-        message2: Union[PubSubMessage, None] = client.get_next_message()
-        assert message is not message2
+        message2: None = client.get_next_message()
+        assert not message2
 
-    def test_message_retention_is_configurable(selft):
+    def test_attributes_can_be_added_to_messages(self, client: PubSubClient):
         """
-        Confirm that should we configure 0 retention of known messages, no
+        Confirm that attributes can be added to messages
+        """
+
+        topic: pubsub_gapic_types.Topic = pristine_test_topic()
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
+
+        msg_to_send = "foo message bar"
+        client.put_one_message(topic, msg_to_send, foo="bar")
+
+        client.subscribe(subscription)
+
+        message: PubSubMessage = client.get_next_message()
+        assert message.get_attribute("foo") == "bar"
+
+    def test_message_retention_is_configurable(self):
+        """
+        Confirm that should we configure 0 retention of recieved messages, no
         awareness of messages is retained by the client, even where receipt
         has been confirmed
         """
@@ -177,16 +185,20 @@ class TestViaGCP:
         remove_test_db_if_exists()
         client: PubSubClient = PubSubClient(dbname="test_db.json", message_retention={})
 
-        topic: pubsub_gapic_types.Topic = create_test_topic()
-        subscription: pubsub_gapic_types.Subscription = create_test_subscription(topic)
+        topic: pubsub_gapic_types.Topic = pristine_test_topic()
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(topic)
 
         msg_to_send = "foo message bar"
         client.put_one_message(topic, msg_to_send)
 
         client.subscribe(subscription)
 
-        for _ in range(3):
+        message1: PubSubMessage = client.get_next_message()
+        assert message1
+        client.confirm_received(message1)
 
-            message: PubSubMessage = client.get_next_message()
-            client.confirm_received(message)
-            assert len(client.deduplicator.db) == 0
+        message2: PubSubMessage = client.get_next_message()
+        assert message2
+
+if __name__ == "__main__":
+    TestViaGCP()
