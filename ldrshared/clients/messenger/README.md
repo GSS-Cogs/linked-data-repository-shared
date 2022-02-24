@@ -7,7 +7,6 @@
 ## GCP PubSub Client: Usage
 
 ```python
-import json
 from typing import Union
 
 from ldrshared.clients import PubSubClient, BaseMessage, BaseMessenger
