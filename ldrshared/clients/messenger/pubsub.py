@@ -218,7 +218,7 @@ class PubSubClient(BaseMessenger):
 
     def put_one_message(
         self,
-        topic: pubsub_gapic_types.Topic,
+        topic_label: str,
         message_content: Union[str, dict],
         **message_attributes,
     ):
@@ -241,7 +241,7 @@ class PubSubClient(BaseMessenger):
         publisher_client = PublisherClient()
         message_as_bytes: bytes = message_content.encode("utf-8")
         publish_future: Future = publisher_client.publish(
-            topic.name, message_as_bytes, **message_attributes
+            topic_label, message_as_bytes, **message_attributes
         )
         publish_future.result()
 
