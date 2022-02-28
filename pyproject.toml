@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "linked-data-repository-shared"
+name = "ldrshared"
 version = "0.1.0"
 description = ""
 authors = ["Michael Adams <mikelovesbooks@gmail.com>"]
