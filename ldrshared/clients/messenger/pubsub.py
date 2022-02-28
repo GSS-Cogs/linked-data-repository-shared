@@ -166,14 +166,14 @@ class PubSubClient(BaseMessenger):
         self.deduplicator = Deduplicator(dbname, message_retention)
         self.found_message_duplicate = False
 
-    def subscribe(self, subscription: pubsub_gapic_types.Subscription):
+    def subscribe(self, subscription: str):
         """
         Subscribe the messenger client
         """
         subscriber_client = SubscriberClient()
 
         subscription_path: str = subscriber_client.subscription_path(
-            GCP_PROJECT_ID, subscription.name.split("/")[-1]
+            GCP_PROJECT_ID, subscription
         )
 
         def callback(message: Message) -> None:

@@ -53,7 +53,6 @@ def pristine_test_topic() -> pubsub_gapic_types.Topic:
 def pristine_test_subscription(
     topic: pubsub_gapic_types.Topic,
 ) -> pubsub_gapic_types.Subscription:
-    assert isinstance(topic, pubsub_gapic_types.Topic)
     subscription_client = SubscriberClient()
     subscription_id = f"test_subscription_{str(uuid.uuid4())}"
     subscription_path = subscription_client.subscription_path(
@@ -113,7 +112,7 @@ class TestViaGCP:
         msg_to_send = "foo message bar"
         client.put_one_message(topic.name, msg_to_send)
 
-        client.subscribe(subscription)
+        client.subscribe(subscription.name.split("/")[-1])
         message: PubSubMessage = client.get_next_message()
 
         assert (
@@ -132,7 +131,7 @@ class TestViaGCP:
         msg_to_send = "foo message bar"
         client.put_one_message(topic.name, msg_to_send)
 
-        client.subscribe(subscription)
+        client.subscribe(subscription.name.split("/")[-1])
 
         for _ in range(3):
             message: PubSubMessage = client.get_next_message()
@@ -154,7 +153,7 @@ class TestViaGCP:
         msg_to_send = "foo message bar"
         client.put_one_message(topic.name, msg_to_send)
 
-        client.subscribe(subscription)
+        client.subscribe(subscription.name.split("/")[-1])
 
         message: PubSubMessage = client.get_next_message()
         assert (
@@ -178,7 +177,7 @@ class TestViaGCP:
         msg_to_send = "foo message bar"
         client.put_one_message(topic.name, msg_to_send, foo="bar")
 
-        client.subscribe(subscription)
+        client.subscribe(subscription.name.split("/")[-1])
 
         message: PubSubMessage = client.get_next_message()
         assert message.get_attribute("foo") == "bar"
@@ -196,7 +195,7 @@ class TestViaGCP:
         msg_to_send = {"a_field": "a_value"}
         client.put_one_message(topic.name, msg_to_send)
 
-        client.subscribe(subscription)
+        client.subscribe(subscription.name.split("/")[-1])
 
         message: PubSubMessage = client.get_next_message()
 
@@ -221,7 +220,7 @@ class TestViaGCP:
         msg_to_send = "foo message bar"
         client.put_one_message(topic.name, msg_to_send)
 
-        client.subscribe(subscription)
+        client.subscribe(subscription.name.split("/")[-1])
 
         message1: PubSubMessage = client.get_next_message()
         assert message1

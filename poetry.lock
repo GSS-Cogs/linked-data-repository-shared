@@ -112,7 +112,7 @@ proto-plus = ">=1.7.1"
 
 [[package]]
 name = "googleapis-common-protos"
-version = "1.54.0"
+version = "1.55.0"
 description = "Common protobufs used in Google APIs"
 category = "main"
 optional = false
@@ -445,8 +445,8 @@ google-cloud-pubsub = [
     {file = "google_cloud_pubsub-2.9.0-py2.py3-none-any.whl", hash = "sha256:f303a0e8fba3b8d0beccc84d6282ae4864cf40c9cd9431ae7ca4a3191309a10c"},
 ]
 googleapis-common-protos = [
-    {file = "googleapis-common-protos-1.54.0.tar.gz", hash = "sha256:a4031d6ec6c2b1b6dc3e0be7e10a1bd72fb0b18b07ef9be7b51f2c1004ce2437"},
-    {file = "googleapis_common_protos-1.54.0-py2.py3-none-any.whl", hash = "sha256:e54345a2add15dc5e1a7891c27731ff347b4c33765d79b5ed7026a6c0c7cbcae"},
+    {file = "googleapis-common-protos-1.55.0.tar.gz", hash = "sha256:53eb313064738f45d5ac634155ae208e121c963659627b90dfcb61ef514c03e1"},
+    {file = "googleapis_common_protos-1.55.0-py2.py3-none-any.whl", hash = "sha256:183bb0356bd614c4330ad5158bc1c1bcf9bcf7f5e7f911317559fe209496eeee"},
 ]
 grpc-google-iam-v1 = [
     {file = "grpc-google-iam-v1-0.12.3.tar.gz", hash = "sha256:0bfb5b56f648f457021a91c0df0db4934b6e0c300bd0f2de2333383fe958aa72"},
