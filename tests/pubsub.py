@@ -99,7 +99,7 @@ class TestViaGCP:
     def test_a_message_can_be_published(self, client: PubSubClient):
         """ """
         topic = pristine_test_topic()
-        client.put_one_message(topic, "foo message bar")
+        client.put_one_message(topic.name, "foo message bar")
 
     def test_message_can_be_published_subscribed_and_read(self, client: PubSubClient):
         """
@@ -111,7 +111,7 @@ class TestViaGCP:
         )
 
         msg_to_send = "foo message bar"
-        client.put_one_message(topic, msg_to_send)
+        client.put_one_message(topic.name, msg_to_send)
 
         client.subscribe(subscription)
         message: PubSubMessage = client.get_next_message()
@@ -130,7 +130,7 @@ class TestViaGCP:
         )
 
         msg_to_send = "foo message bar"
-        client.put_one_message(topic, msg_to_send)
+        client.put_one_message(topic.name, msg_to_send)
 
         client.subscribe(subscription)
 
@@ -152,7 +152,7 @@ class TestViaGCP:
         )
 
         msg_to_send = "foo message bar"
-        client.put_one_message(topic, msg_to_send)
+        client.put_one_message(topic.name, msg_to_send)
 
         client.subscribe(subscription)
 
@@ -176,7 +176,7 @@ class TestViaGCP:
         )
 
         msg_to_send = "foo message bar"
-        client.put_one_message(topic, msg_to_send, foo="bar")
+        client.put_one_message(topic.name, msg_to_send, foo="bar")
 
         client.subscribe(subscription)
 
@@ -194,7 +194,7 @@ class TestViaGCP:
         )
 
         msg_to_send = {"a_field": "a_value"}
-        client.put_one_message(topic, msg_to_send)
+        client.put_one_message(topic.name, msg_to_send)
 
         client.subscribe(subscription)
 
@@ -219,7 +219,7 @@ class TestViaGCP:
         )
 
         msg_to_send = "foo message bar"
-        client.put_one_message(topic, msg_to_send)
+        client.put_one_message(topic.name, msg_to_send)
 
         client.subscribe(subscription)
 
