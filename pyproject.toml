@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "linked-data-repository-shared"
+version = "0.1.0"
+description = ""
+authors = ["Michael Adams <mikelovesbooks@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+google-cloud-pubsub = "^2.9.0"
+tinydb = "^4.6.1"
+pytest = "^7.0.0"
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests/pubsub.py"
+]
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
