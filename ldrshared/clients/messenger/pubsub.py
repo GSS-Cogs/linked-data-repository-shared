@@ -1,4 +1,5 @@
 from concurrent.futures._base import TimeoutError
+from dataclasses import dataclass
 import datetime
 import logging
 import json
@@ -23,13 +24,14 @@ if not GCP_PROJECT_ID:
 
 
 # Note: docstrings inherit from base class
-class PubSubMessage(BaseMessage):
+@dataclass
+class PubSubMessage(BaseMessage[Message]):
     message: Message
 
-    def get_attribute(self, key: str, default=None):
+    def get_attribute(self, key: Union[str, None], default: Union[str, None] = None):
         return self.message.attributes.get(key, default)
 
-    def get(self, key=None, default=None) -> Union[dict, str, list]:
+    def get(self, key: Union[str, None] = None, default: Union[str, None] = None) -> Union[dict, str, list]:
         data: str = self.message.data.decode("utf-8")
         if key:
             data_as_dict: dict = json.loads(data)
@@ -51,6 +53,11 @@ class Deduplicator:
 
     def __init__(self, dbname: str, message_retention: dict):
         self.db = TinyDB(dbname)
+
+        # Confirm our dict only contains what it should.
+        assert all([x in ['days', 'hours', 'minutes'] for x in message_retention])
+        assert all([isinstance(x, int) for x in message_retention.values()])
+
         self.message_retention: datetime.timedelta = datetime.timedelta(
             days=message_retention["days"] if "days" in message_retention else 0,
             hours=message_retention["hours"] if "hours" in message_retention else 0,
@@ -145,7 +152,7 @@ class Deduplicator:
 
 
 class PubSubClient(BaseMessenger):
-    def _setup(self, dbname="db.json", message_retention={"days": 7}):
+    def _setup(self, dbname: str = "db.json", message_retention: dict = {"days": 7}):
         """
         Setup for pubsub client
 
@@ -205,7 +212,7 @@ class PubSubClient(BaseMessenger):
             except TimeoutError:
                 pass
 
-        if len(self.message_buffer) > 0:
+        if any(self.message_buffer):
             return self.get_next_message(timeout=timeout)
         return None
 

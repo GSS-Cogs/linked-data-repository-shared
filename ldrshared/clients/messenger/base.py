@@ -1,17 +1,15 @@
-from abc import ABCMeta, abstractmethod
-from typing import Union
+from abc import ABCMeta, ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Union, TypeVar, Generic
 
+T = TypeVar("T", bound=object)
 
-class BaseMessage(metaclass=ABCMeta):
-    """
-    Generic message class
-    """
-
-    def __init__(self, message: object):
-        self.message: object = message
+@dataclass
+class BaseMessage(ABC, Generic[T]):
+    message: T
 
     @abstractmethod
-    def get_attribute(self, key: str, default=None) -> str:
+    def get_attribute(self, key: str, default: Union[str, None] = None) -> str:
         """
         Get a single attribute as attached to the message.
 
@@ -20,7 +18,7 @@ class BaseMessage(metaclass=ABCMeta):
         ...
 
     @abstractmethod
-    def get(self, key=None, default=None) -> Union[str, dict, list]:
+    def get(self, key: Union[str, None] = None, default: Union[str, None] = None) -> Union[str, dict, list]:
         """
         Get message content. Empty parenthesis will return the whole 
         message as dict or str (dict where castable, else str).
