@@ -193,13 +193,13 @@ class PubSubClient(BaseMessenger):
             subscription_path, callback=callback
         )
 
-    def get_next_message(self, timeout: int = 10) -> Union[PubSubMessage, None]:
+    def get_next_message(self, timeout: int = 2) -> Union[PubSubMessage, None]:
         """
         Get the next message from the currently subscribed topic
         """
 
         # Don't pull if we already have messages in the buffer
-        if len(self.message_buffer) > 0:
+        if any(self.message_buffer):
             return PubSubMessage(self.message_buffer.pop())
 
         subscriber_client = SubscriberClient()
