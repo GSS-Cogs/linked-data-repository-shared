@@ -4,6 +4,7 @@ import datetime
 import logging
 import json
 import os
+import time
 from typing import Union, List
 
 from google.cloud.pubsub_v1 import PublisherClient, SubscriberClient
@@ -55,7 +56,7 @@ class Deduplicator:
         self.db = TinyDB(dbname)
 
         # Confirm our dict only contains what it should.
-        assert all([x in ['days', 'hours', 'minutes'] for x in message_retention])
+        assert all([x in ['days', 'hours', 'minutes', 'seconds'] for x in message_retention])
         assert all([isinstance(x, int) for x in message_retention.values()])
 
         self.message_retention: datetime.timedelta = datetime.timedelta(
@@ -83,8 +84,14 @@ class Deduplicator:
         """
         Stores the content and timestamp of a single message
         """
-        self.db.insert(self._message_to_dict(message))
-        self._housekeeping()
+        message_as_dict: dict = self._message_to_dict(message)
+        if "time_stamp" in message_as_dict:
+            self.db.insert(message_as_dict)
+            self._housekeeping()
+        else:
+            # Malformed time stamp, ignore but log it
+            logging.warning(f'Malformed message passed to store: {message_as_dict}, '
+                f'"time_stamp" key was {message.attributes.get(TIME_STAMP_KEY)}')
 
     def is_new_message(self, message: Message) -> bool:
         """
@@ -138,7 +145,7 @@ class Deduplicator:
                 logging.warning(f"Length was {len(self.db)}")
                 self.db.remove(doc_ids=[record_id])
                 logging.warning(f"Length is {len(self.db)}")
-                record_id = str(int(record_id) + 1)
+                record_id += 1
             else:
                 logging.warning(
                     f"Comparing: {time_stamp_as_datetime} and {datetime.datetime.now() - self.message_retention}"
@@ -154,7 +161,7 @@ class Deduplicator:
 class PubSubClient(BaseMessenger):
     def _setup(self, dbname: str = "db.json", message_retention: dict = {"days": 7}):
         """
-        Setup for pubsub client
+        Setup for pubsub client 
 
         dbname: Filename for the Tinydb inline message database,
                 configurable for testing.
@@ -237,6 +244,11 @@ class PubSubClient(BaseMessenger):
             message_attributes = {
                 TIME_STAMP_KEY: datetime.datetime.now().strftime(STR_TIME)
             }
+
+        logging.info(f'''
+        Publishing message with text: {message_content}
+        And attributes: {message_attributes}
+        ''')
 
         publisher_client = PublisherClient()
         message_as_bytes: bytes = message_content.encode("utf-8")

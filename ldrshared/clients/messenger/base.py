@@ -4,6 +4,7 @@ from typing import Union, TypeVar, Generic
 
 T = TypeVar("T", bound=object)
 
+
 @dataclass
 class BaseMessage(ABC, Generic[T]):
     message: T
@@ -18,14 +19,16 @@ class BaseMessage(ABC, Generic[T]):
         ...
 
     @abstractmethod
-    def get(self, key: Union[str, None] = None, default: Union[str, None] = None) -> Union[str, dict, list]:
+    def get(
+        self, key: Union[str, None] = None, default: Union[str, None] = None
+    ) -> Union[str, dict, list]:
         """
-        Get message content. Empty parenthesis will return the whole 
+        Get message content. Empty parenthesis will return the whole
         message as dict or str (dict where castable, else str).
 
         You can also .get(key) as per standard dictionary get
         mechanism, which will return one of str|dict|list
-        depending on the document in question. 
+        depending on the document in question.
         """
         ...
 

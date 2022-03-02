@@ -1,8 +1,7 @@
-import datetime
 import os
 from pathlib import Path
+import time
 import uuid
-
 
 from google.cloud.pubsub_v1 import PublisherClient, SubscriberClient
 from google.pubsub_v1.types import pubsub as pubsub_gapic_types
@@ -228,6 +227,62 @@ class TestViaGCP:
 
         message2: PubSubMessage = client.get_next_message()
         assert message2
+
+    def test_old_messages_are_removed(self):
+        """
+        Confirm that messages older than the configured message retention
+        are removed from the inline database by housekeeping.
+        """
+
+        remove_test_db_if_exists()
+        client: PubSubClient = PubSubClient(
+            dbname="test_db.json", message_retention={"seconds": 5}
+        )
+
+        topic: pubsub_gapic_types.Topic = pristine_test_topic()
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(
+            topic
+        )
+
+        msg_to_send = "foo message bar"
+
+        # Fill then remove old messages from a pristine inline db
+        client.put_one_message(topic.name, msg_to_send)
+        client.put_one_message(topic.name, msg_to_send)
+        client.put_one_message(topic.name, msg_to_send)
+        client.subscribe(subscription.name.split("/")[-1])
+        while True:
+            msg = client.get_next_message()
+            if msg:
+                # Note: point at which msg is added to test_db.json
+                client.confirm_received(msg)
+            else:
+                break
+        assert len(client.deduplicator.db) > 0
+        time.sleep(6)
+        client.deduplicator._housekeeping()  # remove messages older than retention
+        assert (
+            len(client.deduplicator.db) == 0
+        ), f"Was pristine database is not empty, has {len(client.deduplicator.db)} records"
+
+        # Fill then remove old messages from a non pristine inline db
+        client.put_one_message(topic.name, msg_to_send)
+        client.put_one_message(topic.name, msg_to_send)
+        client.put_one_message(topic.name, msg_to_send)
+        client.subscribe(subscription.name.split("/")[-1])
+        while True:
+            msg = client.get_next_message()
+            if msg:
+                # Note: point at which msg is added to test_db.json
+                client.confirm_received(msg)
+            else:
+                break
+        assert len(client.deduplicator.db) > 0
+        time.sleep(6)
+        client.deduplicator._housekeeping()  # remove messages older than retention
+        assert (
+            len(client.deduplicator.db) == 0
+        ), f"Was not pristine database is not empty, has {len(client.deduplicator.db)} records"
 
 
 if __name__ == "__main__":
