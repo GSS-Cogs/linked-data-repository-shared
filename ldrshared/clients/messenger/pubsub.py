@@ -30,11 +30,11 @@ if not GCP_PROJECT_ID:
 class PubSubMessage(BaseMessage[Message]):
     message: Message
 
-    def get_attribute(self, key: Union[str, None], default: Union[str, None] = None):
+    def get_attribute(self, key: Optional[str], default: Optional[str] = None):
         return self.message.attributes.get(key, default)
 
     def get(
-        self, key: Union[str, None] = None, default: Union[str, None] = None
+        self, key: Optional[str] = None, default: Optional[str] = None
     ) -> Union[dict, str, list]:
         data: str = self.message.data.decode("utf-8")
         if key:
@@ -207,7 +207,7 @@ class PubSubClient(BaseMessenger):
             subscription_path, callback=callback
         )
 
-    def get_next_message(self, timeout: int = 2) -> Union[PubSubMessage, None]:
+    def get_next_message(self, timeout: int = 2) -> Optional[PubSubMessage]:
         """
         Get the next message from the currently subscribed topic
         """
