@@ -1,3 +1,12 @@
+"""
+These tests currently use GCP credentials which we don't want to manually generate
+and push into git.
+
+So DO NOT rename with the test_ prefix as we only want these to run when
+explicitly called by a developer, not by pytest discovery.
+"""
+
+
 import os
 from pathlib import Path
 import time

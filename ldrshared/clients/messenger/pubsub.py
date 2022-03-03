@@ -5,7 +5,7 @@ import logging
 import json
 import os
 import time
-from typing import Union, List
+from typing import Union, List, Optional
 
 from google.cloud.pubsub_v1 import PublisherClient, SubscriberClient
 from google.cloud.pubsub_v1.subscriber.futures import StreamingPullFuture
@@ -15,6 +15,7 @@ from google.cloud.pubsub_v1.subscriber.message import Message
 from tinydb import TinyDB, Query
 
 from .base import BaseMessenger, BaseMessage
+from ldrshared.constants import MESSAGE_SCHEMA_KEY
 
 STR_TIME = "%b/%d/%Y %H:%M:%S"
 TIME_STAMP_KEY = "_published_time_stamp"
@@ -29,10 +30,12 @@ if not GCP_PROJECT_ID:
 class PubSubMessage(BaseMessage[Message]):
     message: Message
 
-    def get_attribute(self, key: Union[str, None], default: Union[str, None] = None):
+    def get_attribute(self, key: Optional[str], default: Optional[str] = None):
         return self.message.attributes.get(key, default)
 
-    def get(self, key: Union[str, None] = None, default: Union[str, None] = None) -> Union[dict, str, list]:
+    def get(
+        self, key: Optional[str] = None, default: Optional[str] = None
+    ) -> Union[dict, str, list]:
         data: str = self.message.data.decode("utf-8")
         if key:
             data_as_dict: dict = json.loads(data)
@@ -56,7 +59,9 @@ class Deduplicator:
         self.db = TinyDB(dbname)
 
         # Confirm our dict only contains what it should.
-        assert all([x in ['days', 'hours', 'minutes', 'seconds'] for x in message_retention])
+        assert all(
+            [x in ["days", "hours", "minutes", "seconds"] for x in message_retention]
+        )
         assert all([isinstance(x, int) for x in message_retention.values()])
 
         self.message_retention: datetime.timedelta = datetime.timedelta(
@@ -90,8 +95,11 @@ class Deduplicator:
             self._housekeeping()
         else:
             # Malformed time stamp, ignore but log it
-            logging.warning(f'Malformed message passed to store: {message_as_dict}, '
-                f'"time_stamp" key was {message.attributes.get(TIME_STAMP_KEY)}')
+            logging.warning(
+                'Malformed message passed to store: %s, "time_stamp" key was %s',
+                message_as_dict,
+                message.attributes.get(TIME_STAMP_KEY),
+            )
 
     def is_new_message(self, message: Message) -> bool:
         """
@@ -161,7 +169,7 @@ class Deduplicator:
 class PubSubClient(BaseMessenger):
     def _setup(self, dbname: str = "db.json", message_retention: dict = {"days": 7}):
         """
-        Setup for pubsub client 
+        Setup for pubsub client
 
         dbname: Filename for the Tinydb inline message database,
                 configurable for testing.
@@ -200,7 +208,7 @@ class PubSubClient(BaseMessenger):
             subscription_path, callback=callback
         )
 
-    def get_next_message(self, timeout: int = 2) -> Union[PubSubMessage, None]:
+    def get_next_message(self, timeout: int = 2) -> Optional[PubSubMessage]:
         """
         Get the next message from the currently subscribed topic
         """
@@ -227,6 +235,7 @@ class PubSubClient(BaseMessenger):
         self,
         topic_label: str,
         message_content: Union[str, dict],
+        message_schema: Optional[int] = None,
         **message_attributes,
     ):
         """
@@ -245,10 +254,15 @@ class PubSubClient(BaseMessenger):
                 TIME_STAMP_KEY: datetime.datetime.now().strftime(STR_TIME)
             }
 
-        logging.info(f'''
+        if message_schema:
+            message_attributes[MESSAGE_SCHEMA_KEY] = message_schema
+
+        logging.info(
+            f"""
         Publishing message with text: {message_content}
         And attributes: {message_attributes}
-        ''')
+        """
+        )
 
         publisher_client = PublisherClient()
         message_as_bytes: bytes = message_content.encode("utf-8")
