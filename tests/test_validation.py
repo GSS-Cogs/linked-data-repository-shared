@@ -1,4 +1,3 @@
-from socket import MSG_DONTWAIT
 import pytest
 from unittest.mock import Mock
 
