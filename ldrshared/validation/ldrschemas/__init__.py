@@ -1,0 +1,1 @@
+from .jsonschemawrapper import confirm_indexer_trigger_message
