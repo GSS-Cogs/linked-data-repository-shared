@@ -1,0 +1,1 @@
+MESSAGE_SCHEMA_KEY = "_schema"

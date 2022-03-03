@@ -11,12 +11,6 @@ tinydb = "^4.6.1"
 pytest = "^7.0.0"
 jsonschema = "^4.4.0"
 
-[tool.pytest.ini_options]
-testpaths = [
-    "tests/pubsub.py",
-    "tests/validation.py"
-]
-
 [tool.poetry.dev-dependencies]
 
 [build-system]

@@ -1,27 +1,56 @@
-from jsonschema import validate, ValidationError
-
 from typing import Optional
 
+from jsonschema import validate, ValidationError
 
-def confirm_indexer_trigger_message(message_dict: dict) -> Optional[ValidationError]:
-    """
-    Validates dict against required schema of the message used to trigger the
-    linked-data-repository-indexer service
-    """
+from ldrshared.clients import BaseMessage
+from ldrshared.constants import MESSAGE_SCHEMA_KEY
 
-    # Note: At a time of writing the expected behaviour is the message
-    # will point to an input file (a csvw) on an attached volume, hence
-    # "input_data_path", change as needed as our thinking develops.
-    
-    # IMPORTANT: if you do change this, make sure to flush the queue,
-    # changing what is and is not a valid message while there are messages
-    # in flight is probably to be avoided.
-    
-    schema = {
-        "additionalProperties": False,
-        "properties": {
-            "input_data_path": {"type": "string"},
-        },
-        "required": ["input_data_path"],
+
+def confirm_indexer_trigger_message(message: BaseMessage):
+    """
+    Validates that the indexer triggering message is valid and
+    conforms to an appropriate schema.
+    """
+    schemas = {
+        "1": {
+            "additionalProperties": False,
+            "properties": {
+                "input_data_path": {"type": "string"},
+            },
+            "required": ["input_data_path"],
+        }
     }
-    validate(instance=message_dict, schema=schema)
+    _validate_message_schema(message, schemas)
+
+
+def _validate_message_schema(message: BaseMessage, schemas: dict):
+    """
+    For a given message, this function will:
+
+    - confirm we have an attribute of MESSAGE_SCHEMA_KEY
+    - check that this key exists in the known schemas for this dict
+    - check that the message in question actually containts a dict
+    - confirm that dict conforms to the claimed schema
+
+    Any failures of the above will raise: ValidationError
+    """
+
+    message_schema_version: str = message.get_attribute(MESSAGE_SCHEMA_KEY, None)
+
+    if not message_schema_version:
+        raise ValidationError(
+            f"Cannot validate message {message_as_dict} as required schema version is missing"
+        )
+
+    if message_schema_version not in schemas:
+        raise ValidationError(
+            f'Message "{MESSAGE_SCHEMA_KEY}" specified schema {message_schema_version},'
+            f" is not in known versions: {list(schemas.keys())}"
+        )
+
+    message_as_dict: dict = message.get()
+
+    if not isinstance(message_as_dict, dict):
+        raise ValidationError("Validating dict message that's not a dict!")
+
+    validate(instance=message_as_dict, schema=schemas[message_schema_version])
