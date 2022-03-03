@@ -67,3 +67,16 @@ def test_message_schema_does_not_exist_raises():
     with pytest.raises(ValidationError) as excinfo:
         ldrschemas.confirm_indexer_trigger_message(msg)
     assert "is not in known versions" in str(excinfo.value)
+
+
+def test_validating_a_schemaless_message_raises():
+    """
+    Check that the appropriate error is raised where we try and
+    validate a message with no declared schema
+    """
+
+    msg = Mock()
+
+    with pytest.raises(ValidationError) as excinfo:
+        ldrschemas.confirm_indexer_trigger_message(msg)
+    assert "is not in known versions" in str(excinfo.value)
