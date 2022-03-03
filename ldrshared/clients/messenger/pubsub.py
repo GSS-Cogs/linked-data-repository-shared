@@ -96,8 +96,9 @@ class Deduplicator:
         else:
             # Malformed time stamp, ignore but log it
             logging.warning(
-                f"Malformed message passed to store: {message_as_dict}, "
-                f'"time_stamp" key was {message.attributes.get(TIME_STAMP_KEY)}'
+                'Malformed message passed to store: %s, "time_stamp" key was %s',
+                message_as_dict,
+                message.attributes.get(TIME_STAMP_KEY),
             )
 
     def is_new_message(self, message: Message) -> bool:
