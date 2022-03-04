@@ -14,6 +14,7 @@ import uuid
 
 from google.cloud.pubsub_v1 import PublisherClient, SubscriberClient
 from google.pubsub_v1.types import pubsub as pubsub_gapic_types
+from google.cloud.pubsub_v1.publisher.futures import Future
 from google.api_core.exceptions import NotFound
 import pytest
 
@@ -107,6 +108,18 @@ class TestViaGCP:
         """ """
         topic = pristine_test_topic()
         client.put_one_message(topic.name, "foo message bar")
+
+    def test_pull_message_from_empty_queue(self, client: PubSubClient):
+        """ """
+        topic: pubsub_gapic_types.Topic = pristine_test_topic()
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(
+            topic
+        )
+
+        client.subscribe(subscription.name.split("/")[-1])
+
+        for _ in range(10):
+            assert not client.get_next_message()
 
     def test_message_can_be_published_subscribed_and_read(self, client: PubSubClient):
         """
@@ -292,6 +305,35 @@ class TestViaGCP:
         assert (
             len(client.deduplicator.db) == 0
         ), f"Was not pristine database is not empty, has {len(client.deduplicator.db)} records"
+
+
+    def test_non_client_messages_are_not_stored(self, client: PubSubClient):
+        """
+        Non client generated messages cannot be used for deduplication as they
+        lack the required time_stamp attribute. Comfirm such messages are
+        not being stored.
+        """
+
+        topic: pubsub_gapic_types.Topic = pristine_test_topic()
+        subscription: pubsub_gapic_types.Subscription = pristine_test_subscription(
+            topic
+        )
+
+        client.subscribe(subscription.name.split("/")[-1])
+
+        publisher_client = PublisherClient()
+        message_as_bytes: bytes = 'foooo'.encode("utf-8")
+        publish_future: Future = publisher_client.publish(
+            topic.name, message_as_bytes
+        )
+        publish_future.result()
+
+        message1: PubSubMessage = client.get_next_message()
+        assert message1
+        client.confirm_received(message1)
+        assert not any(client.deduplicator.db)
+
+
 
 
 if __name__ == "__main__":

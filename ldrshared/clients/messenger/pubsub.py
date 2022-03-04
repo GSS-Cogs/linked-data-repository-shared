@@ -90,13 +90,13 @@ class Deduplicator:
         Stores the content and timestamp of a single message
         """
         message_as_dict: dict = self._message_to_dict(message)
-        if "time_stamp" in message_as_dict:
+        if message_as_dict["time_stamp"]:
             self.db.insert(message_as_dict)
             self._housekeeping()
         else:
             # Malformed time stamp, ignore but log it
             logging.warning(
-                'Malformed message passed to store: %s, "time_stamp" key was %s',
+                'Unstructured message passed to store: %s, "time_stamp" value was %s',
                 message_as_dict,
                 message.attributes.get(TIME_STAMP_KEY),
             )
@@ -213,7 +213,8 @@ class PubSubClient(BaseMessenger):
         Get the next message from the currently subscribed topic
         """
 
-        # Don't pull if we already have messages in the buffer
+        # Don't pull if we already have messages in the buffer, but disregard
+        # any messages without the time stamp required for deduplication
         if any(self.message_buffer):
             return PubSubMessage(self.message_buffer.pop(0))
 
