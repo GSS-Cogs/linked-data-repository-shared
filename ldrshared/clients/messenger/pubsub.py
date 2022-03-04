@@ -215,7 +215,7 @@ class PubSubClient(BaseMessenger):
 
         # Don't pull if we already have messages in the buffer
         if any(self.message_buffer):
-            return PubSubMessage(self.message_buffer.pop())
+            return PubSubMessage(self.message_buffer.pop(0))
 
         subscriber_client = SubscriberClient()
         streaming_pull_future: StreamingPullFuture = self.streaming_pull_future
