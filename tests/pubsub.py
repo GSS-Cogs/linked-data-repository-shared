@@ -4,9 +4,14 @@ and push into git.
 
 So DO NOT rename with the test_ prefix as we only want these to run when
 explicitly called by a developer, not by pytest discovery.
+
+Note: Im using a timeout of 10 seconds when polling for messages throught, its
+not necessary in the wild as if (where pubsubs being slow) and you dont get a 
+message in the default 2 you just poll again, here we dont have the luxury.
 """
 
-
+import json
+import logging
 import os
 from pathlib import Path
 import time
@@ -134,7 +139,7 @@ class TestViaGCP:
         client.put_one_message(topic.name, msg_to_send)
 
         client.subscribe(subscription.name.split("/")[-1])
-        message: PubSubMessage = client.get_next_message()
+        message: PubSubMessage = client.get_next_message(timeout=10)
 
         assert (
             message.get() == msg_to_send
@@ -155,7 +160,9 @@ class TestViaGCP:
         client.subscribe(subscription.name.split("/")[-1])
 
         for _ in range(3):
-            message: PubSubMessage = client.get_next_message()
+            # Note: timeout needs to be greater than the default 10 second
+            # resend, otherwise this can pass/fail intermitantly
+            message: PubSubMessage = client.get_next_message(timeout=10)
 
             assert (
                 message.get() == msg_to_send
@@ -176,7 +183,7 @@ class TestViaGCP:
 
         client.subscribe(subscription.name.split("/")[-1])
 
-        message: PubSubMessage = client.get_next_message()
+        message: PubSubMessage = client.get_next_message(timeout=10)
         assert (
             message.get() == msg_to_send
         ), f"Got message {message}, expected message {msg_to_send}"
@@ -200,7 +207,7 @@ class TestViaGCP:
 
         client.subscribe(subscription.name.split("/")[-1])
 
-        message: PubSubMessage = client.get_next_message()
+        message: PubSubMessage = client.get_next_message(timeout=10)
         assert message.get_attribute("foo") == "bar"
 
     def test_dict_message_functionality(self, client: PubSubClient):
@@ -218,7 +225,7 @@ class TestViaGCP:
 
         client.subscribe(subscription.name.split("/")[-1])
 
-        message: PubSubMessage = client.get_next_message()
+        message: PubSubMessage = client.get_next_message(timeout=10)
 
         assert isinstance(message.get(), dict)
         assert message.get("a_field") == "a_value"
@@ -243,11 +250,11 @@ class TestViaGCP:
 
         client.subscribe(subscription.name.split("/")[-1])
 
-        message1: PubSubMessage = client.get_next_message()
+        message1: PubSubMessage = client.get_next_message(timeout=10)
         assert message1
         client.confirm_received(message1)
 
-        message2: PubSubMessage = client.get_next_message()
+        message2: PubSubMessage = client.get_next_message(timeout=10)
         assert message2
 
     def test_old_messages_are_removed(self):
@@ -258,7 +265,7 @@ class TestViaGCP:
 
         remove_test_db_if_exists()
         client: PubSubClient = PubSubClient(
-            dbname="test_db.json", message_retention={"seconds": 5}
+            dbname="test_db.json", message_retention={"seconds": 20}
         )
 
         topic: pubsub_gapic_types.Topic = pristine_test_topic()
@@ -273,15 +280,19 @@ class TestViaGCP:
         client.put_one_message(topic.name, msg_to_send)
         client.put_one_message(topic.name, msg_to_send)
         client.subscribe(subscription.name.split("/")[-1])
+        msg_count = 0
         while True:
-            msg = client.get_next_message()
+            msg = client.get_next_message(timeout=10)
             if msg:
                 # Note: point at which msg is added to test_db.json
                 client.confirm_received(msg)
+                msg_count += 1
             else:
+                assert msg_count == 3, f'Did not read 3 messages, read {msg_count}'
                 break
         assert len(client.deduplicator.db) > 0
-        time.sleep(6)
+        
+        time.sleep(10)
         client.deduplicator._housekeeping()  # remove messages older than retention
         assert (
             len(client.deduplicator.db) == 0
@@ -293,7 +304,7 @@ class TestViaGCP:
         client.put_one_message(topic.name, msg_to_send)
         client.subscribe(subscription.name.split("/")[-1])
         while True:
-            msg = client.get_next_message()
+            msg = client.get_next_message(timeout=10)
             if msg:
                 # Note: point at which msg is added to test_db.json
                 client.confirm_received(msg)
@@ -328,12 +339,10 @@ class TestViaGCP:
         )
         publish_future.result()
 
-        message1: PubSubMessage = client.get_next_message()
+        message1: PubSubMessage = client.get_next_message(timeout=10)
         assert message1
         client.confirm_received(message1)
         assert not any(client.deduplicator.db)
-
-
 
 
 if __name__ == "__main__":

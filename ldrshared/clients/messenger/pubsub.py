@@ -17,12 +17,14 @@ from tinydb import TinyDB, Query
 from .base import BaseMessenger, BaseMessage
 from ldrshared.constants import MESSAGE_SCHEMA_KEY
 
-STR_TIME = "%b/%d/%Y %H:%M:%S"
+STR_TIME = "%Y-%m-%d %H:%M:%S.%f"
 TIME_STAMP_KEY = "_published_time_stamp"
 
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", None)
 if not GCP_PROJECT_ID:
     raise ValueError("You need to set the project id via the env var GCP_PROJECT_ID")
+
+logging.basicConfig(filename='logs.log', encoding='utf-8', level=logging.INFO)
 
 
 # Note: docstrings inherit from base class
@@ -80,26 +82,33 @@ class Deduplicator:
         """
         Convert type pubsub_v1.subscriber.message.Message to a simple dict
         """
-        return {
+        d = {
             "content": message.data.decode("utf-8"),
             "time_stamp": message.attributes.get(TIME_STAMP_KEY),
         }
+        logging.info(f'Returning message as dict: {json.dumps(d, indent=2)}')
+
+        return d
+
 
     def store(self, message: Message):
         """
         Stores the content and timestamp of a single message
         """
         message_as_dict: dict = self._message_to_dict(message)
-        if message_as_dict["time_stamp"]:
-            self.db.insert(message_as_dict)
-            self._housekeeping()
+        if "time_stamp" in message_as_dict.keys():
+            if message_as_dict["time_stamp"]:
+                self.db.insert(message_as_dict)
+                self._housekeeping()
+            else:
+                # Nulled time stamp, ignore but log it
+                logging.warning(
+                    'Unstructured message passed to store: %s, "time_stamp" value was %s',
+                    message_as_dict,
+                    message.attributes.get(TIME_STAMP_KEY),
+                )
         else:
-            # Malformed time stamp, ignore but log it
-            logging.warning(
-                'Unstructured message passed to store: %s, "time_stamp" value was %s',
-                message_as_dict,
-                message.attributes.get(TIME_STAMP_KEY),
-            )
+            logging.error(f'Expected time_stamp key missing from message: {message}')
 
     def is_new_message(self, message: Message) -> bool:
         """
@@ -107,10 +116,20 @@ class Deduplicator:
         """
         new_message_as_dict = self._message_to_dict(message)
         q = Query()
-        found = self.db.search(
-            (q.content == new_message_as_dict["content"])
-            & (q.time_stamp == new_message_as_dict["time_stamp"])
-        )
+
+        try:
+            found = self.db.search(
+                (q.content == new_message_as_dict["content"])
+                & (q.time_stamp == new_message_as_dict["time_stamp"])
+            )
+        except Exception as err:
+            msg = (
+                f'Error {err} when searching deduplication db\n'
+                f'Message: {message}\n',
+                f'Message_as_dict: {new_message_as_dict}\n',
+                f'Database entries: {self.db}\n')
+            logging.error(msg)
+            raise Exception(msg) from err
         return len(found) == 0
 
     def message_is_in_list(
@@ -147,16 +166,28 @@ class Deduplicator:
             time_stamp_as_datetime = datetime.datetime.strptime(
                 record["time_stamp"], STR_TIME
             )
+
+            too_old = (datetime.datetime.now() - self.message_retention).strftime(STR_TIME)
+
+            logging.warning(f'''
+                A message with timestamp: {time_stamp_as_datetime}
+                At time of: {datetime.datetime.now().strftime(STR_TIME)}
+                When compared to {too_old}
+                Is marked for disregarding? {time_stamp_as_datetime <= (
+                datetime.datetime.now() - self.message_retention
+            )}''')
+
             if time_stamp_as_datetime <= (
                 datetime.datetime.now() - self.message_retention
             ):
-                logging.warning(f"Length was {len(self.db)}")
+                logging.warning(f"Db length was {len(self.db)}")
                 self.db.remove(doc_ids=[record_id])
-                logging.warning(f"Length is {len(self.db)}")
+                logging.warning(f"Db length is {len(self.db)}")
                 record_id += 1
             else:
                 logging.warning(
                     f"Comparing: {time_stamp_as_datetime} and {datetime.datetime.now() - self.message_retention}"
+                    " and found message is not outdated."
                 )
                 break
 
