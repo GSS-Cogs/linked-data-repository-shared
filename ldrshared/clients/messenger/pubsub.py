@@ -223,6 +223,16 @@ class PubSubClient(BaseMessenger):
         )
 
         def callback(message: Message) -> None:
+
+            if not message:
+                logging.warning(f'''
+                    Future resolved to null message!
+                    buffer is: {self.message_buffer}.
+                    inline db contains: {self.deduplicator.db}''')
+                
+                # If this is the issues return None will fix it,
+                # but dont add it until we _know_ thats the issue
+
             # Is message in database as previously processed?
             if self.deduplicator.is_new_message(message):
                 message.nack()
