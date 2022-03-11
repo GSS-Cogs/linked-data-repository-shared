@@ -10,7 +10,6 @@ from typing import Union, List, Optional
 from google.cloud.pubsub_v1 import PublisherClient, SubscriberClient
 from google.cloud.pubsub_v1.subscriber.futures import StreamingPullFuture
 from google.cloud.pubsub_v1.publisher.futures import Future
-from google.pubsub_v1.types import pubsub as pubsub_gapic_types
 from google.cloud.pubsub_v1.subscriber.message import Message
 from tinydb import TinyDB, Query
 
@@ -86,8 +85,6 @@ class Deduplicator:
             "content": message.data.decode("utf-8"),
             "time_stamp": message.attributes.get(TIME_STAMP_KEY),
         }
-        logging.info(f'Returning message as dict: {json.dumps(d, indent=2)}')
-
         return d
 
 
@@ -170,7 +167,7 @@ class Deduplicator:
             too_old = (datetime.datetime.now() - self.message_retention).strftime(STR_TIME)
 
             logging.warning(f'''
-                A message with timestamp: {time_stamp_as_datetime}
+                A message of: {json.dumps(record, indent=2)}
                 At time of: {datetime.datetime.now().strftime(STR_TIME)}
                 When compared to {too_old}
                 Is marked for disregarding? {time_stamp_as_datetime <= (
@@ -257,6 +254,9 @@ class PubSubClient(BaseMessenger):
         # Don't pull if we already have messages in the buffer, but disregard
         # any messages without the time stamp required for deduplication
         if any(self.message_buffer):
+            logging.warning(f'Returning message from message buffer: {self.message_buffer} of size {len(self.message_buffer)}')
+            msg = self.message_buffer.pop(0)
+            logging.warning(f'Returned message is: {msg}, buffer has size {len(self.message_buffer)}')
             return PubSubMessage(self.message_buffer.pop(0))
 
         subscriber_client = SubscriberClient()
