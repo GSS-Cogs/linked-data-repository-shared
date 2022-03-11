@@ -257,7 +257,7 @@ class PubSubClient(BaseMessenger):
             logging.warning(f'Returning message from message buffer: {self.message_buffer} of size {len(self.message_buffer)}')
             msg = self.message_buffer.pop(0)
             logging.warning(f'Returned message is: {msg}, buffer has size {len(self.message_buffer)}')
-            return PubSubMessage(self.message_buffer.pop(0))
+            return PubSubMessage(msg)
 
         subscriber_client = SubscriberClient()
         streaming_pull_future: StreamingPullFuture = self.streaming_pull_future
